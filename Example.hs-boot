@@ -1,3 +1,3 @@
-module Example (ExampleChan ()) where
+module ExampleP (ExampleChan ()) where
 
 data ExampleChan = ExampleChan

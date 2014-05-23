@@ -1,4 +1,4 @@
-module PriorityQueue (PQueueChan ()) where
+module PriorityQueueP (PQueueChan ()) where
 
 import EffectCapabilities
 
