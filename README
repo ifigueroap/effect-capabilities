@@ -1,0 +1,64 @@
+Effect Capabilities
+========================
+
+This is the implementation of our paper "Effect Capabilities"
+by Ismael Figueroa, Nicolas Tabareau and Éric Tanter.
+For more information please visit http://pleiad.cl/effectcaps
+
+This software was tested on the Haskell Platform 2012.4.0.0,
+which means the GHC version is 7.4.1. If you have any problems please
+contact me at ifiguero@dcc.uchile.cl
+
+
+Running the examples
+=====================
+
+Section 2
+=========
+The examples of Section 2 (and some more) are in the ExamplesSection2.hs. The code can be executed by evaluating (runM c) in ghci, for some client code c.
+
+Queue and Stack implementation
+==============================
+The complete implementations, including permissions and error handling
+of the stack and queue ADTs are in files Queue.hs and Stack.hs
+respectively. The PriorityQueue ADT is implemented in
+PriorityQueue.hs.
+
+File Example.hs has a running example of using the
+priority queue, and also two examples of handling exceptions thrown by the dequeue operation.
+
+Config module example
+===========================
+The Config.hs file contains the implementation of the Config
+module. The implemention differs from the paper, in that we use the
+readFile and writeFile functions as defined by the IO permission
+lattice presented in Section 6.
+
+Delegability
+===========================
+The example of static delegability is given in files A.hs, B.hs and C.hs; with their respective .hs-boot files.
+
+
+Internal implementations
+==============================
+The technical details of our proposal are in the following files:
+
+- EffectCapabilities.hs: defines capabilities, the sharing mechanism,
+  and the Implies permission relation.
+
+- MonadStatePV.hs: defines the protected MonadStatePV class for
+  accessing state using capabilities. It depends on the StateTP
+  transformer, located in Control/Monad/State/StateTP.hs
+
+- MonadErrorPV.hs: defines the protected MonadErrorPV class for
+  throwing and catching exceptions using capabilities. It depends on
+  the ErrorTP transformer, located in Control/Monad/ErrorTP.hs
+
+- ProtectedIO folder: contains the definitions for the protected IO
+  monad. In particular,
+  	 - the protected IO monad class in IOPClass.hs
+	 - the proposed lattice of permissions for taming IO in Permissions.hs
+	 - the corresponding IO-based functions, wrapped in IOP:
+		- FileSystem.hs
+		- HandleIO.hs
+		- Encoding.hs
