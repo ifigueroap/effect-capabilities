@@ -48,6 +48,11 @@ instance (Error e, MonadState s m) => MonadState s (ErrorTP c e m) where
     get = lift get
     put = lift . put
 
+instance (Error e, MonadError e m) => MonadError e (ErrorTP k e m) where
+    throwError       = lift . throwError
+    m `catchError` h = ErrorTP $ ErrorT $ runErrorTP m
+        `catchError` \e -> runErrorTP (h e)
+
 instance (Error e, MonadReader r m) => MonadReader r (ErrorTP c e m) where
     ask       = lift ask
     local f m = ErrorTP $ ErrorT $ local f (runErrorTP m)

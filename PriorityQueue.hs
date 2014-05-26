@@ -6,25 +6,25 @@
              UndecidableInstances
   #-}
 
-module PriorityQueueP (
+module PriorityQueue (
  PQueueChan (),
- peekByPriority,
+ peekBy,
 ) where
 
 import Data.List
 import Control.Monad.MonadStateP
 import EffectCapabilities
-import QueueP
-import {-# SOURCE #-} ExampleP
+import Queue
+import {-# SOURCE #-} ExamplesSection4
 
 data PQueueChan = PQueueChan
 
 queueState :: QState ReadPerm
 queueState = fromChannel PQueueChan $ receive ReadPerm
 
-peekByPriority :: (Ord s, MonadStateP QState [s] m) => (s -> s -> Ordering) -> m (Maybe s)
-peekByPriority comp = do queue <- fromCapT queueState getp 
-                         if null queue
-                            then return Nothing
-                            else return (Just $ maximumBy comp queue)
+peekBy :: (Ord s, MonadStateP QState [s] m) => (s -> s -> Ordering) -> m (Maybe s)
+peekBy comp = do queue <- fromCapT queueState getp 
+                 if null queue
+                   then return Nothing
+                   else return (Just $ maximumBy comp queue)
 
