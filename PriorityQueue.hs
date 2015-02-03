@@ -28,3 +28,9 @@ peekBy comp = do queue <- fromCapT queueState getp
                    then return Nothing
                    else return (Just $ maximumBy comp queue)
 
+peek :: (MonadStateP QState [s] m) => m (Maybe s)
+peek = do queue <- fromCapT queueState getp 
+          if null queue
+            then return Nothing
+            else return (Just $ head queue)                        
+
