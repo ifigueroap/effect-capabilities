@@ -7,6 +7,12 @@
              FlexibleInstances
   #-}
 
+-- There is a bug when using Deriving Generic and hs-boot files in GHC <= 7.6.3
+-- https://ghc.haskell.org/trac/ghc/ticket/7878
+
+-- Implementation of the Queue module, considering all enhancements
+-- from Section 4.
+
 module Queue (
        enqueue,
        dequeue,
@@ -16,48 +22,52 @@ module Queue (
        QError ()
 ) where
 
-import Control.Monad.Error
-import MonadStatePV
-import MonadErrorPV as EPV
-import Control.Monad.Error as E
+import Control.Monad.MonadErrorP
+import Control.Monad.MonadStateP
 import EffectCapabilities
 import GHC.Generics
 import {-# SOURCE #-} PriorityQueue
-import {-# SOURCE #-} Example
+import {-# SOURCE #-} ExamplesSection4
 
+-- Code from Section 4.1: Private State
 
-data QError a = QError a deriving Generic
-instance Capability QError ImpliesEx
+data QState p = QState p -- deriving Generic
 
-instance Send ExampleChan QError TCPerm
+instance Capability QState ImpliesRW where
+ attenuate (QState _) perm = QState perm
 
-newtype QState a = QState a
-instance Capability QState ImpliesRW
-  where attenuate (QState _) perm = QState perm
+enqueue :: MonadStateP QState [s] m => s -> m ()
+enqueue x = do queue  <- fromCapT (QState ReadPerm) getp
+               fromCapT (QState WritePerm) $ putp (queue ++ [x])
 
-instance Send PQueueChan QState ReadPerm 
-  where receive perm = return $ QState perm  
+dequeue :: MonadStateP QState [s] m => m s
+dequeue = do queue <- fromCapT (QState ReadPerm) getp
+             fromCapT (QState WritePerm) $ putp (tail queue)
+             return $ head queue        
 
--- newtype QState a = QState a deriving (Generic, Show)
--- instance Capability QState a
--- instance Send PQueueChan QState ReadPerm
+-- Section 4.2: Sharing state with PriorityQueue
 
-enqueue :: MonadStatePV QState n m [s] => s -> m ()
-enqueue x = do queue  <- fromCapT (QState RWPerm) get
-               fromCapT (QState RWPerm) $ put (queue ++ [x])
+instance Send PQueueChan QState ReadPerm where
+ receive perm = return $ QState perm
 
-dequeue :: MonadStatePV QState n m [s] => m s
-dequeue = do queue <- fromCapT (QState RWPerm) get
-             fromCapT (QState RWPerm) $ put (tail queue)
-             return $ head queue
+-- Section 4.3: Protected exceptions 
 
-dequeueErr :: (MonadStatePV QState n m [s], MonadErrorPV QError n' m String) => m s
-dequeueErr = fromCapT (QError CatchPerm) $ EPV.catchError dequeueEx (\e -> error e) 
+data QError p = QError p
+
+instance Capability QError ImpliesEx where
+ attenuate (QError _) perm = QError perm
+
+instance Send ExampleChan QError TCPerm where
+ receive perm = return $ QError perm
+
+dequeueEx :: (MonadStateP QState [s] m, MonadErrorP QError String m) => m s
+dequeueEx = do queue <- fromCapT (QState ReadPerm) getp
+               if null queue
+                  then fromCapT (QError ThrowPerm) $ throwErrorp "Queue is empty"
+                  else do fromCapT (QState WritePerm) $ putp (tail queue)
+                          return $ head queue
+
+dequeueErr :: (MonadStateP QState [s] m, MonadErrorP QError String m) => m s
+dequeueErr = fromCapT (QError CatchPerm) $ catchErrorp dequeueEx error
                     
 
-dequeueEx :: (MonadStatePV QState n m [s], MonadErrorPV QError n' m String) => m s
-dequeueEx = do queue <- fromCapT (QState ReadPerm) get
-               if null queue
-                  then fromCapT (QError ThrowPerm) $ EPV.throwError "Queue is empty"
-                  else do fromCapT (QState WritePerm) $ put (tail queue)
-                          return $ head queue

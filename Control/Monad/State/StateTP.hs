@@ -60,9 +60,9 @@ instance (MonadError e m) => MonadError e (StateTP k s m) where
     m `catchError` h = StateTP $ StateT $ \s -> runStateT (runSTP m) s
         `catchError` \e -> runStateT (runSTP (h e)) s
 
--- instance (MonadErrorP c e m, Capability c p) => MonadErrorP (c ()) e (StateTP c s m) where
+-- instance (MonadErrorP c e m, Capability c p) => MonadErrorP c e (StateTP (c ()) s m) where
 --     throwErrorp c     = lift . (throwErrorp c)
---     catchErrorp c m h = StateTP $ StateT $ \s -> catchErrorp c $ runStateT (runSTP m) s (\e -> runStateT (runSTP (h e))) s
+    -- catchErrorp c m h = StateTP $ StateT $ \s -> catchErrorp c $ runStateT (runSTP m) s (\e -> runStateT (runSTP (h e))) s
 
 -- Needs -fallow-undecidable-instances
 instance (MonadReader r m) => MonadReader r (StateTP k s m) where

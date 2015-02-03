@@ -1,25 +1,38 @@
 {-# LANGUAGE TypeOperators,
              FlexibleContexts,
-             FlexibleInstances,
              ScopedTypeVariables,
-             FunctionalDependencies,
-             DeriveGeneric
+             DefaultSignatures,
+             MultiParamTypeClasses,
+             DeriveGeneric,
+             FlexibleInstances
   #-}
 
-module Stack (push, pop, SState ()) where
+-- There is a bug when using Deriving Generic and hs-boot files in GHC <= 7.6.3
+-- https://ghc.haskell.org/trac/ghc/ticket/7878
 
-import MonadStatePV
+module Stack (
+       push,
+       pop,
+       SState (),
+) where
+
+import Control.Monad.MonadErrorP
+import Control.Monad.MonadStateP
+import Control.Monad.Trans
 import EffectCapabilities
 import GHC.Generics
 
-newtype SState a = SState a deriving Generic
-instance Capability SState ImpliesRW
 
-push :: MonadStatePV SState n m [s] => s -> m ()
-push x = do xs <- fromCapT (SState RWPerm) get
-            fromCapT (SState WritePerm) $ put (x:xs) 
+data SState p = SState p -- deriving Generic
 
-pop :: MonadStatePV SState n m [s] => m s
-pop = do xs <- fromCapT (SState ReadPerm) get
-         fromCapT (SState WritePerm) $ put (tail xs)
-         return (head xs)
+instance Capability SState ImpliesRW where
+ attenuate (SState _) perm = SState perm
+
+push :: (MonadTrans t, Monad (t m), MonadStateP SState [s] m) => s -> (t m) ()
+push x = do stack <- lift $ fromCapT (SState ReadPerm) getp
+            lift (fromCapT (SState WritePerm) $ putp (x:stack))
+
+pop :: (MonadTrans t, Monad (t m), MonadStateP SState [s] m) => (t m) s
+pop = do stack <- lift $ fromCapT (SState ReadPerm) getp
+         lift (fromCapT (SState WritePerm) $ putp (tail stack))
+         return $ head stack                    
