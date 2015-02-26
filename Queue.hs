@@ -37,12 +37,12 @@ instance Capability QState ImpliesRW where
  attenuate (QState _) perm = QState perm
 
 enqueue :: MonadStateP QState [s] m => s -> m ()
-enqueue x = do queue  <- fromCapT (QState ReadPerm) getp
-               fromCapT (QState WritePerm) $ putp (queue ++ [x])
+enqueue x = do queue  <- getp `withCapability` (QState ReadPerm)
+               putp (queue ++ [x]) `withCapability` (QState WritePerm)               
 
 dequeue :: MonadStateP QState [s] m => m s
-dequeue = do queue <- fromCapT (QState ReadPerm) getp
-             fromCapT (QState WritePerm) $ putp (tail queue)
+dequeue = do queue <- getp `withCapability` (QState ReadPerm)
+             putp (tail queue) `withCapability` (QState WritePerm)
              return $ head queue        
 
 -- Section 4.2: Sharing state with PriorityQueue
@@ -61,10 +61,10 @@ instance Send ExampleChan QError TCPerm where
  receive perm = return $ QError perm
 
 dequeueEx :: (MonadStateP QState [s] m, MonadErrorP QError String m) => m s
-dequeueEx = do queue <- fromCapT (QState ReadPerm) getp
+dequeueEx = do queue <- getp `withCapability` (QState ReadPerm)
                if null queue
-                  then fromCapT (QError ThrowPerm) $ throwErrorp "Queue is empty"
-                  else do fromCapT (QState WritePerm) $ putp (tail queue)
+                  then throwErrorp "Queue is empty" `withCapability` (QError ThrowPerm)
+                  else do putp (tail queue) `withCapability` (QState WritePerm)
                           return $ head queue
 
 dequeueErr :: (MonadStateP QState [s] m, MonadErrorP QError String m) => m s

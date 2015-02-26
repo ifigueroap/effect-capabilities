@@ -1,10 +1,9 @@
-{-# LANGUAGE TypeOperators,
-             FlexibleContexts,
-             FlexibleInstances,
-             ScopedTypeVariables,
-             MultiParamTypeClasses,
-             UndecidableInstances
-  #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module ExamplesSection4 where 
 
@@ -13,26 +12,16 @@ import qualified PriorityQueue as PQ
 import Control.Monad.Identity
 import Control.Monad.MonadErrorP
 import Control.Monad.Error
-import Control.Monad.MonadStateP
 import Control.Monad.ErrorTP 
 import Control.Monad.State.StateTP
 import EffectCapabilities
 
-type M = ErrorTP (QError ()) String (StateTP (QState ()) [Int] (ErrorT String Identity))
+type M = ErrorTP  (QError ()) String
+         (StateTP (QState ()) [Int]
+         (ErrorT  String Identity))
 
 runM :: M a -> Either String (Either String a)
 runM c = runIdentity $ runErrorT $flip evalStateTP [] (runErrorTP c)
-                     
--- runM c = runIdentity $ flip evalStateTP [] $ runErrorTP (runErrorT c)
-
--- instance MonadError e m => MonadError e (StateTP c s m) where
---   throwError = lift . throwError
-
--- instance (Monad m, Error e, MonadStateP c s m) => MonadStateP c s (ErrorT e m) where
---   getp   = lift $ fromCapT (undefined :: (c ReadPerm)) getp
---   putp s = fromCapT (undefined :: (c WritePerm)) putp s
-
--- instance (Error e1, Error e2, MonadErrorP c e1 m) => MonadErrorP c e1 (ErrorT e2 m) where
 
 -- Section 4.2: PriorityQueue example
 priorityQueueEx :: M (Maybe Int, Maybe Int)
@@ -60,15 +49,18 @@ catchQErrorPerm :: QError CatchPerm
 catchQErrorPerm = attenuate tcQErrorPerm CatchPerm
 
 -- Example of protected exceptions
-
 consume :: M Int
 consume = do x <- dequeueEx
              if (x < 0)
-                then (lift . lift . throwError) "Process error"
+                then throwError "Process error"
                 else return x
 
+-- cannot lift catchErrorp due to limitation in mtl
+-- the tranformers library has the liftCatch operation
+-- This is why we use the regular ErrorT transformer in addition to ErrorTP
+             
 process :: Int -> M Int
-process val = consume `catchError` (\e -> return val)
+process val =  consume `catchError` (\e -> return val)
 
 -- Uses default value 23, because it catches process-invariant exception (values > 0)
 program1 :: M Int
@@ -80,5 +72,5 @@ program2 :: M Int
 program2 = process 23
 
 -- Catches queue-invariant from program2, and runs program1 with no issues
-debug prog = fromCapT catchQErrorPerm $ prog `catchErrorp` (\e -> error "Error in queue invariant!")
-
+debug prog = prog `catchErrorp` (\e -> error "Error in queue invariant!")
+             `withCapability` catchQErrorPerm

@@ -23,13 +23,13 @@ queueState :: QState ReadPerm
 queueState = fromChannel PQueueChan $ receive ReadPerm
 
 peekBy :: (Ord s, MonadStateP QState [s] m) => (s -> s -> Ordering) -> m (Maybe s)
-peekBy comp = do queue <- fromCapT queueState getp 
+peekBy comp = do queue <- getp `withCapability` queueState 
                  if null queue
                    then return Nothing
                    else return (Just $ maximumBy comp queue)
 
 peek :: (MonadStateP QState [s] m) => m (Maybe s)
-peek = do queue <- fromCapT queueState getp 
+peek = do queue <- getp `withCapability` queueState
           if null queue
             then return Nothing
             else return (Just $ head queue)                        

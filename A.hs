@@ -1,16 +1,19 @@
-{-# LANGUAGE MultiParamTypeClasses,
-             FlexibleInstances,             
-             DeriveGeneric
-  #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module A where
 
 import EffectCapabilities
 import GHC.Generics
+import Control.Monad.MonadStateP
 import {-# SOURCE #-} B
 
-data Cap a = Cap a 
-data Perm = Perm 
+data RWCap p = RWCap p
 
-instance Send BChannel Cap Perm where       
-  receive _ = return $ Cap Perm
+instance Capability RWCap ImpliesRW where
+  attenuate c_p perm' = RWCap perm'
+
+instance Send BChannel RWCap RWPerm where       
+  receive _ = return $ RWCap RWPerm

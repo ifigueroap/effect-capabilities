@@ -23,3 +23,5 @@ readConfig  f   = IOP.readFile  readPerm  f
 writeConfig f s = IOP.writeFile writePerm f s
 
 readConfigDefault = readConfig "defaultConfig.txt"
+
+main = runIOP readConfigDefault

@@ -29,10 +29,10 @@ instance Capability SState ImpliesRW where
  attenuate (SState _) perm = SState perm
 
 push :: (MonadTrans t, Monad (t m), MonadStateP SState [s] m) => s -> (t m) ()
-push x = do stack <- lift $ fromCapT (SState ReadPerm) getp
+push x = do stack <- lift $ getp `withCapability` (SState ReadPerm)
             lift (fromCapT (SState WritePerm) $ putp (x:stack))
 
 pop :: (MonadTrans t, Monad (t m), MonadStateP SState [s] m) => (t m) s
-pop = do stack <- lift $ fromCapT (SState ReadPerm) getp
+pop = do stack <- lift $ getp `withCapability` (SState ReadPerm)
          lift (fromCapT (SState WritePerm) $ putp (tail stack))
          return $ head stack                    

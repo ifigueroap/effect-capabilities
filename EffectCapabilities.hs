@@ -18,6 +18,7 @@ module EffectCapabilities (
   CapT (..),
   fromCapT,
   mapCapT,
+  withCapability,
 
   -- ** Capabilities and Permissions
   Capability (..), 
@@ -63,7 +64,9 @@ simply pass 'undefined' coerced to the required type.
 -}
 
 fromCapT :: c -> CapT c m a -> m a
-fromCapT !c (CapT m) = runReaderT m c 
+fromCapT !c (CapT m) = runReaderT m c
+
+withCapability m c = fromCapT c m
 
 instance Monad m => MonadReader c (CapT c m) where
    ask              = CapT ask
