@@ -83,7 +83,12 @@ p1' = runM client1'
 -- We show the polymorphic implementation of enqueue, dequeue, using MonadQueue
 
 newtype QueueT s m a = QueueT { unQueueT :: StateT [s] m a }
-        deriving (Functor, Monad, MonadTrans)
+        deriving (Functor, Monad) -- Add MonadTrans if not using Monad Views
+
+instance MonadTrans (QueueT s) where
+  lift m = QueueT . StateT $ \s -> do
+        a <- m
+        return (a, s)
 
 evalQueueT :: Monad m => QueueT s m a -> [s] -> m a
 evalQueueT = evalStateT . unQueueT
@@ -110,7 +115,12 @@ dequeue = deq
 -- We show the polymorphic implementation of push, pop, using MonadStack
    
 newtype StackT s m a = StackT { unStackT :: StateT [s] m a }
-        deriving (Functor, Monad, MonadTrans)
+        deriving (Functor, Monad) -- Add MonadTrans if not using MonadViews
+
+instance MonadTrans (StackT s) where
+  lift m = StackT . StateT $ \s -> do
+        a <- m
+        return (a, s)
 
 evalStackT :: Monad m => StackT s m a -> [s] -> m a
 evalStackT = evalStateT . unStackT

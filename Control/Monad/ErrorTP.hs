@@ -25,7 +25,12 @@ import EffectCapabilities
  -}
 
 newtype ErrorTP c e m a = ErrorTP {runETP :: ErrorT e m a} 
-        deriving (Functor, Monad, MonadPlus, MonadTrans, MonadCont, MonadIO) 
+        deriving (Functor, Monad, MonadPlus, MonadCont, MonadIO) -- Add MonadTrans if not using MonadViews
+
+instance (Error e) => MonadTrans (ErrorTP c e) where
+  lift m = ErrorTP . ErrorT $ do
+        a <- m
+        return (Right a)
 
 -- Instance of the protected MonadErrorP class
 instance (Monad m, Error e) => MonadErrorP c e (ErrorTP (c ()) e m) where

@@ -21,7 +21,7 @@ type M = ErrorTP  (QError ()) String
          (ErrorT  String Identity))
 
 runM :: M a -> Either String (Either String a)
-runM c = runIdentity $ runErrorT $flip evalStateTP [] (runErrorTP c)
+runM c = runIdentity $ runErrorT $ flip evalStateTP [] (runErrorTP c)
 
 -- Section 4.2: PriorityQueue example
 priorityQueueEx :: M (Maybe Int, Maybe Int)

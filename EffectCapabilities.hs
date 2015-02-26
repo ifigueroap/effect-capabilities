@@ -47,7 +47,12 @@ these computations, by calling 'fromCapT'.
 -}
 
 newtype CapT c m a = CapT (ReaderT c m a) 
-        deriving (Functor, Monad, MonadTrans, MonadPlus, MonadIO, MonadCont)
+        deriving (Functor, Monad, MonadPlus, MonadIO, MonadCont) -- Add MonadTrans if not using monad views
+
+-- This is required because the custom definition of MonadTrans in
+-- Monad Views does not work with GeneralizedNewtypeDeriving
+instance MonadTrans (CapT c) where
+  lift m = CapT . ReaderT $ \_ -> m
                  
 -- | Similar to 'mapReaderT', transforms the computation protected by 'CapT'.
 mapCapT :: (m a -> n b) -> CapT c m a -> CapT c n b
