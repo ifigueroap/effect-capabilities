@@ -41,6 +41,8 @@ instance MonadTrans (StateTP k s) where
    lift m = StateTP . StateT $ \s -> do
         a <- m
         return (a, s)
+   mt = MT
+   unlift = undefined
 
 runStateTP :: Monad m => StateTP k s m a -> s -> m (a, s)
 runStateTP m s = runStateT (runSTP m) s

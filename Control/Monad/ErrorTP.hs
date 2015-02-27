@@ -31,6 +31,20 @@ instance (Error e) => MonadTrans (ErrorTP c e) where
   lift m = ErrorTP . ErrorT $ do
         a <- m
         return (Right a)
+  mt = MT
+  unlift f = ErrorTP . ErrorT $ f $ \m -> runErrorT $ runETP m
+
+{-
+
+instance (Error e) => MonadTrans (ErrorT e) where
+    lift m = ErrorT $ do
+        a <- m
+        return (Right a)
+    mt = MT
+    unlift f = ErrorT $ f $ \m -> runErrorT m
+
+
+-}
 
 -- Instance of the protected MonadErrorP class
 instance (Monad m, Error e) => MonadErrorP c e (ErrorTP (c ()) e m) where

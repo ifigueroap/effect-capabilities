@@ -41,13 +41,14 @@ instance MonadState s m => MonadState s (Tagged t m) where
   get = lift get
   put = lift . put
 
-instance MonadStateP k s m => MonadStateP k s (Tagged (k RWPerm) m) where
+instance MonadStateP c s m => MonadStateP c s (Tagged (c ()) m) where
   getp = mapCapT lift getp
   putp = mapCapT lift.putp
 
--- instance MonadErrorP c e m => MonadErrorP c e (Tagged c m) where
---   throwErrorp c e = lift $ getp key
---   catchError p putp key = lift . (putp key)
+instance MonadErrorP c e m => MonadErrorP c e (Tagged (c ()) m) where
+  throwErrorp = mapCapT lift.throwErrorp
+  -- TODO catchErrorp putp key = lift . (putp key)
+  -- catchErrorp = lift.catchErrorp
 
 -- Protected Tagged Transformers
 

@@ -7,6 +7,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE GADTs #-}
 
 module Control.Monad.Zipper where
 
@@ -16,8 +17,10 @@ import Control.Monad.Reader
 import Control.Monad.Error.Class
 import Control.Monad.Writer
 import Control.Monad.MonadStateP
+-- import Control.Monad.MonadStatePV
 import Control.Monad.MonadErrorP
 import EffectCapabilities
+import Unsafe.Coerce
 
 newtype (t1 :> (t2 :: (* -> *) -> * -> *))  m a = Z { runZ :: t1 (t2 m) a }
 
@@ -67,12 +70,7 @@ tmixmapZ f g m = case (mt :: Transformation t2 m) of
                            MT -> Z $ tmixmap (tmixmap f g) (tmixmap g f) $ runZ m
 -}
 
--- #############################################################################
-
-instance (MonadTrans t1, MonadTrans t2, Monad m, MonadState s (t2 m)) 
-      => MonadState s ((t1 :> t2) m) where
-  get   = Z $ lift $ get 
-  put s = Z $ lift $ put s
+-- ############# Instances for Protected Transformers ##########################
 
 instance (MonadTrans t1, MonadTrans t2, Monad m, MonadStateP k s (t2 m)) 
       => MonadStateP k s ((t1 :> t2) m) where
@@ -81,8 +79,19 @@ instance (MonadTrans t1, MonadTrans t2, Monad m, MonadStateP k s (t2 m))
 
 instance (MonadTrans t1, MonadTrans t2, Monad m, MonadErrorP k e (t2 m))
       => MonadErrorP k e ((t1 :> t2) m) where
-  throwErrorp e   = mapCapT (Z . lift) $ throwErrorp e
-  -- catchErrorp m h = Z $ unlift (\ul -> catchErrorp (ul (runZ m)) (ul . runZ . h))
+  throwErrorp = mapCapT (Z . lift) . throwErrorp
+
+  -- TODO: FIX REMOVE UNSAFECOERCE
+  catchErrorp m h = do
+    c<- ask    
+    mapCapT Z $ unsafeCoerce $ unlift (\ul -> (catchErrorp (ul (runZ m)) (ul . runZ . h) `withCapability` c))
+  
+-- #############################################################################
+
+instance (MonadTrans t1, MonadTrans t2, Monad m, MonadState s (t2 m)) 
+      => MonadState s ((t1 :> t2) m) where
+  get   = Z $ lift $ get 
+  put s = Z $ lift $ put s  
 
 instance (MonadTrans t1, MonadTrans t2, Monad m, MonadError e (t2 m))
       => MonadError e ((t1 :> t2) m) where
@@ -93,7 +102,6 @@ instance (MonadTrans t1, MonadTrans t2, Monad m, MonadReader e (t2 m))
      => MonadReader e ((t1 :> t2) m) where
   ask        = Z $ lift $ ask
   local f m  = Z $ unlift (\ul -> local f (ul $ runZ m))
-
 
 instance (MonadTrans t1, MonadTrans t2, Monad m, MonadWriter w (t2 m)) 
      => MonadWriter w ((t1 :> t2) m) where
