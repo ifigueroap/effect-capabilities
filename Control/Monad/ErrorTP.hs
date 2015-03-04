@@ -2,7 +2,8 @@
              MultiParamTypeClasses,
              UndecidableInstances,
              GeneralizedNewtypeDeriving,
-             FlexibleContexts
+             FlexibleContexts,
+             OverlappingInstances
   #-}
 
 module Control.Monad.ErrorTP where
@@ -34,22 +35,14 @@ instance (Error e) => MonadTrans (ErrorTP c e) where
   mt = MT
   unlift f = ErrorTP . ErrorT $ f $ \m -> runErrorT $ runETP m
 
-{-
-
-instance (Error e) => MonadTrans (ErrorT e) where
-    lift m = ErrorT $ do
-        a <- m
-        return (Right a)
-    mt = MT
-    unlift f = ErrorT $ f $ \m -> runErrorT m
-
-
--}
-
 -- Instance of the protected MonadErrorP class
 instance (Monad m, Error e) => MonadErrorP c e (ErrorTP (c ()) e m) where
     throwErrorp     = lift . ErrorTP . throwError
     catchErrorp m h = lift . ErrorTP $ catchError (runETP m) (runETP . h)
+
+instance (MonadErrorP c1 e1 m, Error e) => MonadErrorP c1 e1 (ErrorTP (c ()) e m) where
+    throwErrorp = mapCapT lift . throwErrorp
+    catchErrorp m h = mapCapT (ErrorTP . ErrorT) $ runErrorT (runETP m) `catchErrorp` (runErrorT . runETP . h)
     
 runErrorTP :: (Error e, Monad m) => ErrorTP c e m a -> m (Either e a)
 runErrorTP m = runErrorT (runETP m)

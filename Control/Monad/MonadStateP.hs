@@ -6,17 +6,21 @@
              IncoherentInstances,
              TypeOperators
   #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ConstraintKinds #-}
 
 module Control.Monad.MonadStateP (
   MonadStateP (..),
   ReadPerm (..),
   WritePerm (..),
   RWPerm (..),
-  ImpliesRW(..)
+  ImpliesRW(..),
 ) where
 
 import EffectCapabilities
 import Data.List
+import GHC.Exts (Constraint)
 
 -- the lattice of Read/Write permissions
 
@@ -24,17 +28,15 @@ data WritePerm = WritePerm deriving Show
 data ReadPerm  = ReadPerm deriving Show
 data RWPerm    = RWPerm deriving Show
 
--- To construct a lattice of permissions
+type family SecretImpliesRW (a :: *) (b :: *) :: Constraint where
+  SecretImpliesRW RWPerm ReadPerm = ()
+  SecretImpliesRW RWPerm WritePerm = ()
+  SecretImpliesRW a a  = ()
+  SecretImpliesRW a () = ()
 
-class SecretImpliesRW a b
 class SecretImpliesRW a b => ImpliesRW a b
-instance SecretImpliesRW a a 
-instance SecretImpliesRW a () 
-instance SecretImpliesRW a b => ImpliesRW a b 
+instance SecretImpliesRW a b => ImpliesRW a b
 
-instance SecretImpliesRW RWPerm ReadPerm
-instance SecretImpliesRW RWPerm WritePerm
-
-class Monad m => MonadStateP c s m | m -> s where
+class Monad m => MonadStateP c s m | m -> s where  
   getp :: (Capability c ImpliesRW, ImpliesRW p ReadPerm) => CapT (c p) m s
   putp :: (Capability c ImpliesRW, ImpliesRW p WritePerm) => s -> CapT (c p) m ()

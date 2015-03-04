@@ -3,39 +3,37 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE UndecidableInstances, OverlappingInstances, IncoherentInstances #-}
 {-# LANGUAGE ImplicitParams #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ConstraintKinds #-}
 
 module Control.Monad.MonadStatePV (
        MonadStatePV (..),
        ReadPerm (..),
        WritePerm (..),
        RWPerm (..),
-       ImpliesRW(..)
+       ImpliesRW(..),
 ) where
 
+import Control.Monad.Trans
+import Control.Monad.Zipper
 import Control.Monad.Mask
 import Control.Monad.MonadStateP
 import Control.Monad.Reader
 import Control.Monad.Views
 import EffectCapabilities
 
-class (Monad m, Monad n, MonadStateP c s n, TWith (c ()) n m) => MonadStatePV c n m s where
+class (Capability c ImpliesRW, Monad m, Monad n, MonadStateP c s n, TWith (c ()) n m) => MonadStatePV c s n m where
 
-  getpv :: (?n :: n (), ImpliesRW perm ReadPerm, Capability c ImpliesRW) => CapT (c perm) m s
-  getpv = do
+  getpv :: (ImpliesRW perm ReadPerm) => n :><: m -> CapT (c perm) m s
+  getpv tag = do
     c <- ask 
-    mapCapT (from $ tag c) getp
-    where tag c = structure (attenuate c ()) :: n :><: m
+    mapCapT (from tag) getp    
    
-  putpv :: (?n :: n (), ImpliesRW perm WritePerm, Capability c ImpliesRW) => s -> CapT (c perm) m ()
-  putpv s = do
+  putpv :: (ImpliesRW perm WritePerm) => n :><: m -> s -> CapT (c perm) m ()
+  putpv tag s = do
     c <- ask 
-    mapCapT (from $ tag c) $ putp s
-    where tag c = structure (attenuate c ()) :: n :><: m
+    mapCapT (from tag) $ putp s
 
-instance (Monad m, Monad n, MonadStateP c s n, TWith (c ()) n m) => MonadStatePV c n m s
-
-
+instance (Capability c ImpliesRW, Monad m, Monad n, MonadStateP c s n, TWith (c ()) n m) => MonadStatePV c s n m

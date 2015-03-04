@@ -8,6 +8,7 @@
              BangPatterns,
              ConstraintKinds,
              FunctionalDependencies
+
  #-}
 
 module EffectCapabilities (
@@ -15,7 +16,8 @@ module EffectCapabilities (
   -- * Generic Capabilities Framework
 
   -- ** Capability Transformer
-  CapT (..),
+  CapT (),
+  mkCapT,
   fromCapT,
   mapCapT,
   withCapability,
@@ -30,6 +32,7 @@ module EffectCapabilities (
 ) where
 
 import GHC.Generics
+import GHC.Exts (Constraint)
 import Control.Monad.Reader
 import Control.Monad.Cont.Class
 
@@ -46,17 +49,29 @@ these computations, by calling 'fromCapT'.
 
 -}
 
-newtype CapT c m a = CapT (ReaderT c m a) 
+newtype CapT c m a = CapT { unCapT :: (ReaderT c m a) }
         deriving (Functor, Monad, MonadPlus, MonadIO, MonadCont) -- Add MonadTrans if not using monad views
 
 -- This is required because the custom definition of MonadTrans in
 -- Monad Views does not work with GeneralizedNewtypeDeriving
 instance MonadTrans (CapT c) where
   lift m = CapT . ReaderT $ \_ -> m
+  mt = MT
+  unlift f = CapT . ReaderT $ \c -> f (\m -> runReaderT (unCapT m) c >>= return . toRP) >>= return . fromRP
+
+data RPair a = RPair a
+instance Functor (RPair) where
+  fmap f (RPair a) = RPair (f a)
+
+toRP   a       = RPair a
+fromRP (RPair a) = a
+
+mkCapT :: (Monad m) => (c -> m a) -> CapT c m a
+mkCapT = CapT . ReaderT
                  
 -- | Similar to 'mapReaderT', transforms the computation protected by 'CapT'.
 mapCapT :: (m a -> n b) -> CapT c m a -> CapT c n b
-mapCapT f (CapT c) = CapT (mapReaderT f c)
+mapCapT f c = CapT (mapReaderT f (unCapT c))
 
 {- |
 
@@ -94,6 +109,8 @@ implementations of 'attenuate'.
 -}
 
 class Capability c_p impl | c_p -> impl where
+  tag :: c_p ()
+  tag = undefined :: c_p () -- TODO: use generic programming
   attenuate :: impl perm perm' => c_p perm -> perm' -> c_p perm'
 
   default attenuate :: (Generic (c_p perm), Generic (c_p perm'), GGetTag perm' (Rep (c_p perm)) (Rep (c_p perm'))) 

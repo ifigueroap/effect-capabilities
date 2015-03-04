@@ -3,8 +3,12 @@
              UndecidableInstances,
              GeneralizedNewtypeDeriving,
              FlexibleContexts,
+             ScopedTypeVariables,
+             InstanceSigs,
              ScopedTypeVariables
   #-}
+
+{-# LANGUAGE ConstraintKinds #-}
 
 module Control.Monad.State.StateTP (
    StateTP (), -- observe we don't export the data constructor
@@ -42,7 +46,14 @@ instance MonadTrans (StateTP k s) where
         a <- m
         return (a, s)
    mt = MT
-   unlift = undefined
+   unlift f = StateTP . StateT $ \s -> f (\m -> runStateT (runSTP m) s >>= return . toRP) >>= return . fromRP
+
+data RPair s a = RPair a s
+instance Functor (RPair s) where
+  fmap f (RPair a s) = RPair (f a) s
+
+toRP   (a,s)       = RPair a s
+fromRP (RPair a s) = (a,s)   
 
 runStateTP :: Monad m => StateTP k s m a -> s -> m (a, s)
 runStateTP m s = runStateT (runSTP m) s
@@ -67,10 +78,10 @@ instance (MonadError e m) => MonadError e (StateTP k s m) where
     m `catchError` h = StateTP $ StateT $ \s -> runStateT (runSTP m) s
         `catchError` \e -> runStateT (runSTP (h e)) s
 
--- instance (MonadErrorP c e m, Capability c p) => MonadErrorP c e (StateTP (c ()) s m) where
---     throwErrorp c     = lift . (throwErrorp c)
-    -- catchErrorp c m h = StateTP $ StateT $ \s -> catchErrorp c $ runStateT (runSTP m) s (\e -> runStateT (runSTP (h e))) s
-
+-- instance (MonadErrorP c1 e m, Capability c1 p) => MonadErrorP c1 e (StateTP (c ()) s m) where
+--     throwErrorp = mapCapT lift . throwErrorp    
+    -- catchErrorp m h = mapCapT (StateTP . StateT) $ (runStateT (runSTP m)) `catchErrorp` (runStateT . runSTP . h)
+    
 -- Needs -fallow-undecidable-instances
 instance (MonadReader r m) => MonadReader r (StateTP k s m) where
     ask       = lift ask

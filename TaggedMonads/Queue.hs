@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ImplicitParams #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE OverlappingInstances, IncoherentInstances, UndecidableInstances #-}
+{-# LANGUAGE TypeOperators #-}
 
 -- There is a bug when using Deriving Generic and hs-boot files in GHC <= 7.6.3
 -- https://ghc.haskell.org/trac/ghc/ticket/7878
@@ -22,41 +22,42 @@ module TaggedMonads.Queue (
 
 import Control.Monad.Trans
 import Control.Monad.Mask
+import Control.Monad.Views
 import Control.Monad.MonadStatePV
 import Control.Monad.MonadErrorPV
 import EffectCapabilities
+import {-# SOURCE #-} ExamplesTaggedMonads
 
 data QState p = QState p
 
 instance Capability QState ImpliesRW where
   attenuate (QState _) perm = QState perm 
 
-enqueue :: forall n m s.(MonadStatePV QState n m [s], TWith (QState ()) n m) => s -> m ()
-enqueue x = let ?n = undefined :: n () in do
-  queue  <- getpv `withCapability` QState ReadPerm
-  putpv (queue ++ [x]) `withCapability` QState WritePerm
+enqueue :: (MonadStatePV QState [s] n m) => n :><: m -> s -> m ()
+enqueue tag x = do
+  queue  <- getpv tag `withCapability` QState ReadPerm
+  putpv tag (queue ++ [x]) `withCapability` QState WritePerm
                   
-dequeue :: forall n m s.(MonadStatePV QState n m [s], TWith (QState ()) n m) => m s
-dequeue = let ?n = undefined :: n () in do
-  queue <- getpv `withCapability` QState ReadPerm
-  putpv (tail queue) `withCapability` QState WritePerm
+dequeue :: (MonadStatePV QState [s] n m) => n :><: m -> m s
+dequeue tag = do
+  queue <- getpv tag `withCapability` QState ReadPerm
+  putpv tag (tail queue) `withCapability` QState WritePerm
   return $ head queue
 
 data QError p = QError p
 
 instance Capability QError ImpliesEx where
- attenuate (QError _) perm = QError perm
+  attenuate (QError _) perm = QError perm
 
--- instance Send ExampleChan QError TCPerm where
---  receive perm = return $ QError perm
+instance Send ExampleChan QError TCPerm where
+ receive perm = return $ QError perm
 
-dequeueEx :: (?qs :: qs (), ?qe :: qe (),
-  MonadStatePV QState qs m [s],    TWith (QState ()) qs  m,
-  MonadErrorPV QError qe m String, TWith (QError ()) qe m) => m s
-dequeueEx = do
-  queue <- let ?n = ?qs in getpv `withCapability` (QState ReadPerm)
+dequeueEx :: (MonadStatePV QState [s] n m, MonadErrorPV QError String n' m)
+             => n :><: m -> n' :><: m -> m s
+dequeueEx vqs vqe = do
+  queue <- getpv vqs `withCapability` (QState ReadPerm)
   if null queue
-    then let ?n = ?qe in throwErrorpv "Queue is empty" `withCapability` (QError ThrowPerm)
-    else do let ?n = ?qs in putpv (tail queue) `withCapability` (QState WritePerm)
+    then throwErrorpv vqe "Queue is empty" `withCapability` (QError ThrowPerm)
+    else do putpv vqs (tail queue) `withCapability` (QState WritePerm)
             return $ head queue  
 

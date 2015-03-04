@@ -16,6 +16,7 @@ import Control.Monad.Identity
 import Control.Monad.Zipper
 import Control.Monad.State.Lazy
 import Control.Monad.Error
+import Control.Monad.Reader
 import Control.Monad.Views (MonadMorphism (..), View (..), (:><:) (..), i, o, vcomp)
 import Control.Monad.MonadStateP
 import Control.Monad.State.StateTP
@@ -45,10 +46,17 @@ instance MonadStateP c s m => MonadStateP c s (Tagged (c ()) m) where
   getp = mapCapT lift getp
   putp = mapCapT lift.putp
 
+instance MonadStateP c1 s m => MonadStateP c1 s (Tagged (c ()) m) where
+  getp = mapCapT lift getp
+  putp = mapCapT lift.putp
+
 instance MonadErrorP c e m => MonadErrorP c e (Tagged (c ()) m) where
   throwErrorp = mapCapT lift.throwErrorp
-  -- TODO catchErrorp putp key = lift . (putp key)
-  -- catchErrorp = lift.catchErrorp
+  catchErrorp m h = mapCapT lift $ (unTag m `catchErrorp` (\e -> unTag (h e)))
+
+instance MonadErrorP c1 e m => MonadErrorP c1 e (Tagged (c ()) m) where
+  throwErrorp = mapCapT lift.throwErrorp
+  catchErrorp m h = mapCapT lift $ (unTag m `catchErrorp` (\e -> unTag (h e)))
 
 -- Protected Tagged Transformers
 

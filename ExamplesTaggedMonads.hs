@@ -11,120 +11,168 @@ module ExamplesTaggedMonads where
 
 import Control.Monad.Identity
 import Control.Monad.Mask
+import Control.Monad.Error
 import Control.Monad.Trans
 import Control.Monad.Views
 import Control.Monad.Zipper
-import Control.Monad.State.StateTP
 import Control.Monad.ErrorTP
-import Control.Monad.MonadStatePV
+import Control.Monad.MonadErrorP
 import Control.Monad.MonadErrorPV
-import EffectCapabilities
+import Control.Monad.State.StateTP
+import Control.Monad.MonadStatePV
 import TaggedMonads.Queue
 import TaggedMonads.Stack
+import EffectCapabilities
 
-type M = TStateTP (QState ()) [Int] (TStateTP (SState ()) [Int] Identity)
+-- ############# Effect interference using explicit lifting #############
+
+
+
+-- ############# Examples without interference using protected and tagged monads #############
+
+
+type M = TStateTP (SState ()) [Int] (TStateTP (QState ()) [Int] Identity)
+
+type N = TStateTP (QState ()) [Int] (TStateTP (SState ()) [Int] Identity)
 
 runM :: M a -> a
-runM c = runIdentity $ evalTStateTP [] $ evalTStateTP [] c
+runM = runIdentity . evalTStateTP [] . evalTStateTP []
+
+runN :: N a -> a
+runN = runIdentity . evalTStateTP [] . evalTStateTP []
+
+-- C-like ADT programming. The views are the handles for the datastructure, and the ADT operations are generic.
 
 -- Must throw an error due to the empty queue, that is, there is no effect interference
 client1 :: M Int
-client1 = do enqueue (1 :: Int)
-             push (2 :: Int)
-             x <- pop
-             y <- pop
+client1 = do enqueue vq (1 :: Int)
+             push vs (2 :: Int)
+             x <- pop vs
+             y <- pop vs
              return (x+y)
+          where vq = structure (tag :: (QState ()))
+                vs = structure (tag :: (SState ()))
+
+-- Must throw an error due to the empty queue, that is, there is no effect interference
+client1' :: (MonadStatePV SState [Int] n' m, MonadStatePV QState [Int] n m) => n :><: m -> n' :><: m -> m Int
+client1' vq vs = do enqueue vq (1 :: Int)
+                    push vs (2 :: Int)
+                    x <- pop vs
+                    y <- pop vs
+                    return (x+y)
+
+client1M :: M Int
+client1M  = client1' (structure (tag :: (QState ()))) (structure (tag :: (SState ())))
+
+client1N :: N Int
+client1N = client1' (structure (tag :: (QState ()))) (structure (tag :: (SState ())))
 
 client2 :: M Int
-client2 = do enqueue (1 :: Int)
-             push (2 :: Int)
-             x <- pop
-             y <- dequeue
+client2 = do enqueue vq (1 :: Int)
+             push vs (2 :: Int)
+             x <- pop vs
+             y <- dequeue vq
              return (x+y)
+          where vq = structure (tag :: (QState ()))
+                vs = structure (tag :: (SState ()))
              
 client3 :: M Int
-client3 = do push (1 :: Int)
-             push (2 :: Int)
-             x <- pop
-             y <- pop
+client3 = do push vs (1 :: Int)
+             push vs (2 :: Int)
+             x <- pop vs
+             y <- pop vs
              return (x+y)
+          where vs = structure (tag :: (SState ()))
 
 client4 :: M Int
-client4 = do enqueue (10 :: Int)
-             enqueue (20 :: Int)
-             x <- dequeue
-             y <- dequeue
+client4 = do enqueue vq (10 :: Int)
+             enqueue vq (20 :: Int)
+             x <- dequeue vq
+             y <- dequeue vq
              return (x+y)
+          where vq = structure (tag :: (QState ()))
 
 -- ##################### Examples with exceptions #####################
-
-type N = TErrorTP (QError ()) String (TErrorTP (EError ()) String (TStateTP (QState ()) [Int] Identity))
-
-runN :: N a -> Either String (Either String a)
-runN c = runIdentity $ evalTStateTP [] $ runTErrorTP $ runTErrorTP c
-
--- receives (QError TCPerm) capability
-data ExampleChan = ExampleChan
-
--- tcQErrorPerm :: QError TCPerm
--- tcQErrorPerm = fromChannel ExampleChan $ receive TCPerm
-
--- -- Using attenuate
--- catchQErrorPerm :: QError CatchPerm
--- catchQErrorPerm = attenuate tcQErrorPerm CatchPerm
-
 data EError p = EError p
 
 instance Capability EError ImpliesEx where
   attenuate (EError _) perm = EError perm
+  
+type L = TErrorTP (QError ()) String (TErrorTP (EError ()) String (TStateTP (QState ()) [Int] Identity))
+
+runL :: L a -> Either String (Either String a)
+runL = runIdentity . evalTStateTP [] . runTErrorTP . runTErrorTP
+
+-- receives (QError TCPerm) capability
+data ExampleChan = ExampleChan
+
+tcQErrorPerm :: QError TCPerm
+tcQErrorPerm = fromChannel ExampleChan $ receive TCPerm
+
+-- Using attenuate
+catchQErrorPerm :: QError CatchPerm
+catchQErrorPerm = attenuate tcQErrorPerm CatchPerm
 
 -- Example of protected exceptions
-consume :: forall qs qe ee m.(
-  MonadStatePV QState qs  m [Int],  TWith (QState ()) qs  m,
-  MonadErrorPV QError qe  m String, TWith (QError ()) qe  m,
-  MonadErrorPV EError ee  m String, TWith (EError ()) ee  m) => m Int
-consume =  do
-    x <- let ?qs = undefined :: qs ()
-             ?qe = undefined :: qe ()
-         in dequeueEx
-    if (x < 0)
-      then let ?n = undefined :: ee () in throwErrorpv "Process error" `withCapability` EError ThrowPerm
-      else return x
+consume :: (
+  MonadStatePV QState [Int]  n   m,
+  MonadErrorPV QError String n'  m,
+  MonadErrorPV EError String n'' m) => n :><: m -> n' :><: m -> n'' :><: m -> m Int
+consume vqs vqe vee =  do x <- dequeueEx vqs vqe
+                          if (x < 0)
+                            then throwErrorpv vee "Process error" `withCapability` EError ThrowPerm
+                            else return x           
 
-client5 :: N Int
-client5 = consume
+client5 :: L Int
+client5 = consume vqs vqe vee
+          where vqs = structure (tag :: QState ())
+                vqe = structure (tag :: QError ())
+                vee = structure (tag :: EError ())
 
-client6 :: N Int
-client6 = do enqueue 10
-             consume
 
-client7 :: N Int
-client7 = do enqueue (-10)
-             consume
+client6 :: L Int
+client6 = do enqueue vqs 10
+             consume vqs vqe vee
+          where vqs = structure (tag :: QState ())
+                vqe = structure (tag :: QError ())
+                vee = structure (tag :: EError ())
 
--- cannot lift catchErrorp due to limitation in mtl
--- the tranformers library has the liftCatch operation
--- This is why we use the regular ErrorT transformer in addition to ErrorTP
+client7 :: L Int
+client7 = do enqueue vqs (-10)
+             consume vqs vqe vee
+          where vqs = structure (tag :: QState ())
+                vqe = structure (tag :: QError ())
+                vee = structure (tag :: EError ())
+
+-- -- cannot lift catchErrorp due to limitation in mtl
+-- -- the tranformers library has the liftCatch operation
+-- -- This is why we use the regular ErrorT transformer in addition to ErrorTP
              
-process :: Int -> N Int
-process val = let ?n = undefined in catchErrorpv consume (\e -> return val) `withCapability` EError CatchPerm
+process :: Int -> L Int
+process val = catchErrorpv vee (consume vqs vqe vee) (\e -> return val) `withCapability` EError CatchPerm
+  where vqs = structure (tag :: QState ())
+        vqe = structure (tag :: QError ())
+        vee = structure (tag :: EError ())
 
-client8 :: N Int
+client8 :: L Int
 client8 = do process 23
-             enqueue (10)
-             x <- dequeueEx             
+             enqueue vqs (10)
+             x <- dequeueEx vqs vqe
              return x
-             
+          where vqs = structure (tag :: QState ())
+                vqe = structure (tag :: QError ())             
 
--- -- Uses default value 23, because it catches process-invariant exception (values > 0)
--- program1 :: N Int
--- program1 = do enqueue (-10)
---               process 23
+-- Uses default value 23, because it catches process-invariant exception (values > 0)
+program1 :: L Int
+program1 = do enqueue vqs (-10)
+              process 23
+           where vqs = structure (tag :: QState ())
 
--- -- Raises "Queue is empty" exception, because it is not caught by process error handler
--- program2 :: N Int
--- program2 = process 23
+-- Raises "Queue is empty" exception, because it is not caught by process error handler
+program2 :: L Int
+program2 = process 23
 
--- -- Catches queue-invariant from program2, and runs program1 with no issues
--- debug prog = prog `catchErrorp` (\e -> error "Error in queue invariant!")
---              `withCapability` catchQErrorPerm
+-- Catches queue-invariant from program2, and runs program1 with no issues
+debug :: L Int -> L Int
+debug prog = catchErrorpv vqe prog (\e -> error "Error in queue invariant!") `withCapability` catchQErrorPerm
+             where vqe = structure (tag :: QError ())

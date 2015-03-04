@@ -8,16 +8,17 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 module Control.Monad.Zipper where
 
+import Control.Applicative
 import Control.Monad.Trans
 import Control.Monad.State
 import Control.Monad.Reader
 import Control.Monad.Error.Class
 import Control.Monad.Writer
 import Control.Monad.MonadStateP
--- import Control.Monad.MonadStatePV
 import Control.Monad.MonadErrorP
 import EffectCapabilities
 import Unsafe.Coerce
@@ -61,15 +62,6 @@ newtype FComp f1 f2 a = FComp { runFComp :: f1 (f2 a) }
 instance (Functor f1, Functor f2) => Functor (FComp f1 f2) where
   fmap f = FComp . fmap (fmap f) . runFComp
 
-
-{-
-tmixmapZ :: forall c t1 t2 m n. (MonadTrans t1, MonadTrans t2, Monad m, Monad n) => 
-              (forall a. m a -> n a) -> (forall b. n b -> m b) -> Z t1 t2 m c -> Z t1 t2 n c
-tmixmapZ f g m = case (mt :: Transformation t2 m) of
-                   MT -> case (mt :: Transformation t2 n) of
-                           MT -> Z $ tmixmap (tmixmap f g) (tmixmap g f) $ runZ m
--}
-
 -- ############# Instances for Protected Transformers ##########################
 
 instance (MonadTrans t1, MonadTrans t2, Monad m, MonadStateP k s (t2 m)) 
@@ -77,14 +69,21 @@ instance (MonadTrans t1, MonadTrans t2, Monad m, MonadStateP k s (t2 m))
   getp = mapCapT (Z . lift) getp 
   putp = mapCapT (Z . lift) . putp
 
-instance (MonadTrans t1, MonadTrans t2, Monad m, MonadErrorP k e (t2 m))
-      => MonadErrorP k e ((t1 :> t2) m) where
-  throwErrorp = mapCapT (Z . lift) . throwErrorp
+instance (MonadTrans t1, MonadTrans t2, Monad m, MonadErrorP k e (t2 m), MonadErrorP k e (t1 (t2 m)))
+         => MonadErrorP k e ((t1 :> t2) m) where
+  throwErrorp e = mapCapT (Z . lift) $ throwErrorp e
+  catchErrorp m h = mapCapT Z $ runZ m `catchErrorp` (runZ . h)
 
-  -- TODO: FIX REMOVE UNSAFECOERCE
-  catchErrorp m h = do
-    c<- ask    
-    mapCapT Z $ unsafeCoerce $ unlift (\ul -> (catchErrorp (ul (runZ m)) (ul . runZ . h) `withCapability` c))
+
+    
+{-
+
+instance MonadErrorP c e m => MonadErrorP c e (Tagged (c ()) m) where
+  throwErrorp = mapCapT lift.throwErrorp
+  catchErrorp m h = mapCapT lift $ (unTag m `catchErrorp` (\e -> unTag (h e)))
+
+-}
+
   
 -- #############################################################################
 
