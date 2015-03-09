@@ -27,13 +27,9 @@ import EffectCapabilities
 class (Capability c ImpliesRW, Monad m, Monad n, MonadStateP c s n, TWith (c ()) n m) => MonadStatePV c s n m where
 
   getpv :: (ImpliesRW perm ReadPerm) => n :><: m -> CapT (c perm) m s
-  getpv tag = do
-    c <- ask 
-    mapCapT (from tag) getp    
+  getpv tag = mapCapT (from tag) getp    
    
   putpv :: (ImpliesRW perm WritePerm) => n :><: m -> s -> CapT (c perm) m ()
-  putpv tag s = do
-    c <- ask 
-    mapCapT (from tag) $ putp s
+  putpv tag s = mapCapT (from tag) $ putp s
 
 instance (Capability c ImpliesRW, Monad m, Monad n, MonadStateP c s n, TWith (c ()) n m) => MonadStatePV c s n m

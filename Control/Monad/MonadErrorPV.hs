@@ -25,14 +25,10 @@ import Control.Monad.Reader
 class (Capability c ImpliesEx, Error e, Monad m, Monad n, MonadErrorP c e n, TWith (c ()) n m) => MonadErrorPV c e n m where
 
   throwErrorpv :: (ImpliesEx perm ThrowPerm) => n :><: m -> e -> CapT (c perm) m a
-  throwErrorpv tag e = do
-      c <- ask 
-      mapCapT (from tag) $ throwErrorp e
+  throwErrorpv tag e = mapCapT (from tag) $ throwErrorp e
 
   catchErrorpv :: (ImpliesEx perm CatchPerm) => n :><: m -> m a -> (e -> m a) -> CapT (c perm) m a
-  catchErrorpv tag ma hnd = do
-      c <- ask 
-      mapCapT (from tag) $ catchErrorp (to tag ma) (\ e -> (to tag (hnd e)))
+  catchErrorpv tag ma hnd = mapCapT (from tag) $ catchErrorp (to tag ma) (to tag . hnd)
 
 
 instance (Capability c ImpliesEx, Error e, Monad n, Monad m, MonadErrorP c e n, TWith (c ()) n m)
