@@ -78,6 +78,10 @@ instance (MonadError e m) => MonadError e (StateTP k s m) where
     m `catchError` h = StateTP $ StateT $ \s -> runStateT (runSTP m) s
         `catchError` \e -> runStateT (runSTP (h e)) s
 
+instance (MonadErrorP c1 e m, Capability c1 p) => MonadErrorP c1 e (StateTP (c ()) s m) where
+  throwErrorp = mapCapT lift . throwErrorp
+  
+
 -- instance (MonadErrorP c1 e m, Capability c1 p) => MonadErrorP c1 e (StateTP (c ()) s m) where
 --     throwErrorp = mapCapT lift . throwErrorp    
     -- catchErrorp m h = mapCapT (StateTP . StateT) $ (runStateT (runSTP m)) `catchErrorp` (runStateT . runSTP . h)

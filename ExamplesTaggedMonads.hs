@@ -20,16 +20,12 @@ import Control.Monad.MonadErrorP
 import Control.Monad.MonadErrorPV
 import Control.Monad.State.StateTP
 import Control.Monad.MonadStatePV
+
 import TaggedMonads.Queue
 import TaggedMonads.Stack
-import EffectCapabilities
-
--- ############# Effect interference using explicit lifting #############
-
-
+import EffectCapabilities                                     
 
 -- ############# Examples without interference using protected and tagged monads #############
-
 
 type M = TStateTP (SState ()) [Int] (TStateTP (QState ()) [Int] Identity)
 
