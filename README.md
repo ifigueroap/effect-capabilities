@@ -1,7 +1,7 @@
 Effect Capabilities
 ========================
 
-This is the implementation of our paper "Effect Capabilities in Haskell"
+This is the implementation of our paper "Effect Capabilities for Haskell"
 by Ismael Figueroa, Nicolas Tabareau and Éric Tanter.
 For more information please visit http://pleiad.cl/effectcaps
 
