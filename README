@@ -5,46 +5,16 @@ This is the implementation of our paper "Effect Capabilities in Haskell"
 by Ismael Figueroa, Nicolas Tabareau and Éric Tanter.
 For more information please visit http://pleiad.cl/effectcaps
 
-This software was tested on the Haskell Platform 2012.4.0.0,
-which means the GHC version is 7.4.1. If you have any problems please
-contact me at ifiguero@dcc.uchile.cl
+This software was tested on the Haskell Platform 2014.4.0.0,
+which means the GHC version is 7.8.3. If you have any problems please
+contact me at ismael.figueroa@ucv.cl
 
+Examples
+========
+The examples of the paper are in the following top-level files:
 
-Running the examples
-=====================
-
-Section 2
-=========
-The examples of Section 2 (and some more) are in the
-ExamplesSection2.hs file
-
-Queue and Priority Queue
-==============================
-The complete implementations, including permissions and error handling
-of the stack and queue ADTs are in files Queue.hs and PriorityQueue.hs
-respectively.
-
-File Example.hs has a running example of using the
-priority queue, and also two examples of handling exceptions thrown by the dequeue operation.
-
-Delegability
-===========================
-The example of static delegability is given in files A.hs, B.hs and C.hs; with their respective .hs-boot files.
-
-
-Internal implementations
-==============================
-The technical details of our proposal are in the following files:
-
-- EffectCapabilities.hs: defines capabilities, the sharing mechanism,
-  and the Implies permission relation.
-
-- MonadStateP.hs: defines the protected MonadStateP class for
-  accessing state using capabilities. It is defined in
-  Control/Monad/MonadStateP.hs and it depends on the StateTP
-  transformer, located in Control/Monad/State/StateTP.hs
-
-- MonadErrorP.hs: defines the protected MonadErrorP class for
-  throwing and catching exceptions using capabilities. It is defined
-  in Control/Monad/MonadErrorP and it depends on
-  the ErrorTP transformer, located in Control/Monad/ErrorTP.hs
+ * Section 2: ExamplesSection2.hs
+ * Section 4: ExamplesSection4.hs
+ * Section 5: ExampleInterferenceViews.hs
+ * Section 5: ExamplesTaggedMonads.hs
+ * Section 5: ExamplesGenericADT.hs
